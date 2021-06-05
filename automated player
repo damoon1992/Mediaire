@@ -1,0 +1,133 @@
+import pygame as pyg, random
+from random import randint
+from time import sleep
+pyg.font.init()
+
+YELLOW = (243, 246, 29)
+BLUE = (70, 177, 226)
+RED = (220, 74, 32)
+colors = [YELLOW, BLUE, RED]
+
+m, n = 6, 6
+pad = 8
+size = 20
+most = 20
+area = (size, size)
+mid = round(len(colors) / 2)
+p_wid = mid * (pad + size) + pad  # panel (non-game area) width
+height, width = m * size, n * size + p_wid
+window = pyg.display.set_mode((width, height))
+pyg.display.set_caption("Flood-It!")
+
+
+class Tile:
+    board = window.subsurface(pyg.Rect(0, 0, n * size, m * size))
+
+    def __init__(self, i):
+        self.i = i
+        self.color = random.choice(colors)
+        self.rect = pyg.Rect(((i % m) * size, (i // n) * size), area)
+        self.draw()
+
+    def __repr__(self):
+        return str(self.i)
+
+    def draw(self):
+        pyg.draw.rect(Tile.board, self.color, self.rect)
+
+
+class Button:
+    def __init__(self, i, color):
+        gap = lambda x: x * (size + pad)
+        self.color = color
+        self.drect = pyg.Rect((gap(i % mid), gap(i // mid)), area)
+        self.rect = self.drect
+        self.draw()
+
+    def draw(self):
+        pyg.draw.rect(Pane.bpane, self.color, self.drect)
+
+
+class Board:
+    def __init__(self):
+        self.board = [Tile(i) for i in range(m * n)]
+        self.blob = [self.board[0]]
+        self.neighbors = []
+        self.make_blob(self.blob[0].color)
+
+    def __getitem__(self, i):
+        return self.board[i]
+
+    def get_neighbors(self, tile):
+        i = tile.i
+        dirs = [-n, 1, n, -1]  # north,east,south,west
+        return [self[i + d] for d in dirs if self.is_valid(i + d, d)]
+
+    def is_valid(self, i, j):
+        if 0 <= i < m * n:
+            # without these conditiobons, blob wraps around corners
+            if j == 1:
+                return i % m >= (i - j) % m
+            elif j == -1:
+                return i % m <= (i - j) % m
+            return True
+
+    def make_blob(self, color):
+        for cell in self.blob:
+            cell.color = color
+            for neighbor in self.get_neighbors(cell):
+                if neighbor.color == cell.color:
+                    if neighbor not in self.blob:
+                        self.blob.append(self[neighbor.i])
+                elif neighbor not in self.neighbors:
+                    self.neighbors.append(self[neighbor.i])
+
+
+class Text:
+    def __init__(self, text, surf, font_size=10):
+        surf.fill((0, 0, 0))
+        font = pyg.font.SysFont('Arial', font_size)
+        font_surf = font.render(text, font_size, (210, 210, 210))
+        self.rect = font_surf.get_rect()
+        surf.blit(font_surf, (0, 0))
+
+
+class Pane:
+    a = size + pad
+    b = p_wid - pad
+    pane = window.subsurface(pyg.Rect(n * size, 0, p_wid, height))
+    bpane = pane.subsurface(pyg.Rect(pad, pad, b, 4 * a))
+    click = pane.subsurface(pyg.Rect(pad, 2 * (size + 1.555*pad), b, 2 * a))
+    replay = pane.subsurface(pyg.Rect(pad, 3 * (size - pad/4), b, a))
+    end = pane.subsurface(pyg.Rect(pad, 3 * (size/2 + 2*pad), b, a))
+
+    def __init__(self):
+        self.buttons = [Button(i, c) for i, c in enumerate(colors)]
+        self.restart = Text('Replay', Pane.replay)
+        self.update()
+
+    def update(self, count=0):
+        self.click = Text('Clicks: %d/%d' % (count, most), Pane.click)
+
+
+def flood_it():
+    board = Board()
+    pane = Pane()
+    clicks = 0
+    play = True
+    while True:
+        for event in pyg.event.get():
+
+                if play:
+                    board.make_blob(random.choice(colors))
+                    print(random.choice(colors))
+                    [tile.draw() for tile in board.board]
+                    clicks += 1
+                    pane.update(clicks)
+                    if len(board.blob) == m * n or clicks >= most:
+                        play = False
+
+        pyg.display.update()
+
+
+flood_it()
